@@ -1,0 +1,167 @@
+#!/bin/bash
+#DIGGER TOOL
+#by Hood3dRob1n
+#General Enumeration Tool for recon
+
+#Bundled version so works with BinGoo dorker tool
+
+digger_banner(){
+cat <<"EOT"
+
+                           .                             ` ..JgNMMMMMMMr
+                  ..JgNMB=`                             .gMMMMMM$`JMMF`N
+          ..`..JTWgN#"``                           ` .JMMMMMM9=!JdBM@.`d
+       .JMMMNmjMM9^                              ` .jMMMMMHbJ:.jMGMD^^`d
+       dMM5MMM#^`  `                            ` .MMMMM@W:`JgM9JMt^^^`d
+    ` .TMm??WMMN,``                            ` ?MMMMX5+.JMM5JdM3.^^^.P
+   `.JjdMYNx^TMMMm.                              ` TMMMNgM91JMNM^^`^^^J:
+  `.8dMY`  TN,JNMMp.    `  `` `......`` `  `         ?M8jgMMMMM%^^^^^JF
+  .NM"   `  .WMMMMMN,   ` .JZVT9u&7WHHNa..          .ZgMMmTMMM@`^^^^J@
+ .MD`         ` 7HHMMm. .Wf??7TWNgJTJTNyHyn.   ```.MmJMM@?Tm?HP^^^`J@
+.#'              .UkMMNgWMZ`^^^^^?7NJTJWNdNX.`  .MMMMMY`    7n,`^.JY
+7`                `?NVM#d#:^^^^^^^^.?hJhdbdNp .MNMHkY`` ` `   ?hJY`
+                  ` .MMNJN,^^^:^^^:JgJNy9QmgNMMMHkY`
+                 ` dBTN#hXl^^:^^:.zdDg@CJD?74MMMF`
+   ` ..... ` ``    `h,?h.dr`:^^...?5JMRGs    `J#L.` `
+    .MMMMMMMNNggJJJJgMm,^?HmJJg?7TWjMMkZN+   .W@dnna,.`
+    .#.TMNMMMMMMMMMMMMMMNaJ.?7Y:^^?JMMMMNHgMN.XjMMMMMm.` `
+    .#Jm,?WMMMMMMMMMMMMMMMMMNeWae.^^.^^?HmJT9YWMMMMMMMMNgJ..  `
+   ` FJN,_`L?TWMMMMNMMMMMMMMMNNdMH&^^^^^dMNgMNMtMMMMMMMMNJL`-. `
+    .U<3+INTRA+FTW````````````````````````````````````````.TMm.
+   .KJHY!``````````````Digger Recon Tool v1``````````````` +`NJMx`
+     ?zJ!````````````````````````````By:Hood3dRob1n````` .G.MMuM#:
+        ?Tu..````````````````````````````````````````````..?Nd#dY
+          ` ?TYSaJ..................JJgqNNMMMMMMMMMMMMMNaJ.?WEd'
+          .MMMN, ` .MMMMM9"""""7?!` .+MMMNKMMMMMMMMMMMMMMMMN,d'
+          ,NWMMMm.MMMMMD`        .gMMMMMMMMNWMMMMMMMMMMMMMMMN%
+     `      TkMMMMMMMD`    ` `.J"TMMMMMMMMMMNkHMMMMMMMMMMMMM@
+          `` .UdMMMN,       .J=.. ..`7TMMMMMMMNXMNN,
+              `JHXMMMm.`  `.D`..........JM9=`  TkMMML.               `
+                 7kNMM# ` .D........JH9^        `WWMMF
+                  .T9=   .E,...`..M#^           ``?"!`
+                         d4g`. .M#!
+                         dJMn:JMMm..    `                            `
+     `                   `bMDdMMMMMMMM@!
+                          vxJMMMMMMM" `
+                        ` `?MMMMMMMm.
+                             ?TWMMMMMe `                             `
+EOT
+}
+
+#ALEXA CHECK - alexa.com
+alexa_check(){
+	echo
+	curl http://www.alexa.com/search?q=$DIGGERTARGET 2> /dev/null | grep "<strong>Rank" | sed 's/<li><strong>//' | sed 's/<\/strong>//' | sed 's/<\/li>//' | sed 's/Rank:/Alexa Global Rank: /' | grep --color "Alexa Global Rank"
+	echo
+}
+
+#SHARED HOSTING - SameIP.org
+sameIP_check(){
+	echo "SameIP Shared Hosting Results:" | grep --color 'SameIP Shared Hosting Results'
+	curl http://sameip.org/ip/$DIGGERTARGETIP 2> /dev/null | grep "href=" | cut -d '=' -f 2 | grep http | sed 's/"htt/htt/' | sed 's/" rel//' | grep -v "\" target"
+	echo
+}
+
+#SHARED HOSTING - Bing.com
+digger_bing_mobile_shared_checker(){
+	echo "BING! Shared Hosting Results:" | grep --color -E 'BING||Shared Hosting Results'
+	JUNK=/tmp
+	BASECOUNT=69
+	page=0
+	CLEANRES=$(mktemp -p $JUNK -t fooooobar1.tmp.XXX)
+
+	while [ "$BASECOUNT" == 69 ]; do
+		URL="http://m.bing.com/search/search.aspx?A=webresults&Q=ip%3a$DIGGERTARGETIP&D=Web&SI=$page""0"
+		DIRTYRES=`mktemp -p "$JUNK" -t fooooobar2.tmp.XXX`
+		wget -q -O "$DIRTYRES" "$URL"
+		WASHRES=$(cat "$DIRTYRES"| egrep -o  "(<span class=\"c2\">)[^<]+(<\/)" | sed -e 's/<span class="c2">\|<\///g')
+		BASECOUNT=$(echo "$WASHRES" | wc -l)
+		echo "$WASHRES" >> "$CLEANRES"
+		rm -f "$DIRTYRES"
+		let page=$page+1 
+	done
+
+	FINALRES=$(cat "$CLEANRES" | cut -d '/' -f 1 | tr '[:upper:]' '[:lower:]' | sort | uniq)
+
+	rm -f "$CLEANRES"
+
+	for h in $(echo "$FINALRES")
+	do
+		echo "$OUTRESULTS$h"
+	done	
+}
+#End Bing Shared Hosting Checker
+
+#Sub-Domain Checker - onlinetoolkit.org
+digger_sub_chk(){
+	echo
+	echo "Results from OnlineToolkit Sub Checker:" | grep --color 'Results from OnlineToolkit Sub Checker'
+	curl http://subnetscanner.onlinetoolkit.org/?input=$DIGGERTARGETIP 2> /dev/null | grep $DIGGERTARGET | grep "href=" | cut -d '=' -f 3 | sed 's/" class//' | sort | uniq
+	echo
+}
+
+#WHOIS - Linux built in whois command with filtering to clean out the junk
+digger_whois_chk(){
+	echo "Whois Lookup Results:" | grep --color 'Whois Lookup Results'
+	whois "$DIGGERTARGET" 2> /dev/null | sed '1,7d' | sed '11,43d' | sed '12,13d' | sed '12c\Registrant:' | sed '21,21d' | sed '36,36d' | sed '42,42d' | sed '47,49d' |  sed '53,90d' | grep --color -E "Domain Name||Registrar||Registrant||Administrative Contact||Whois Server||Technical Contact||Registration Service Provider||Referral URL||Record expires on||Record created on||Registrar of Record||Name Server||Status||Updated Date||Creation Date||Expiration Date||Domain servers in listed order||Domain status||Domain name"
+	echo
+}
+
+# Run simple NMAP Scan and show results
+digger_nmap_chk(){
+	echo
+	nmap -PN -A "$DIGGERTARGET" > "$STORAGE5"
+}
+digger_nmap_chk2(){
+	echo "Running quick check with NMAP...." | grep --color 'Running quick check with NMAP'
+	echo
+	wait #for NMAP in case its still running in background by time we get here....once done run check on nmap result file ;)
+	cat "$STORAGE5" | sed '1,2d' | grep -v 'Service detection performed' | grep -v 'Nmap done' | sed 's/Nmap scan report for/NMAP Results for:/' | sed 's/\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]\)//' | grep --color -A 100 -E 'NMAP Results for:' 2> /dev/null
+	rm -f "$STORAGE5" 2> /dev/null
+}
+
+
+#MAIN
+digger_banner | grep --color -E 'Digger Recon Tool v1||By||Hood3dRob1n'
+echo "Welcome to Hood3dRob1n's Digger Tool" | grep --color -E 'Welcome to Hood3dRob1n||s Digger Tool'
+echo
+echo
+echo "Please enter the site you want to get info on:" | grep --color 'Please enter the site you want to get info on'
+read DIGGERTARGET
+# Resolve hostname to ip so can feed to different tools as needed, once done:
+# $DIGGERTARGET=hostname
+# $DIGGERTARGETIP=IP
+if [ `echo "$TARGET" | egrep  "(([0-9]+\.){3}[0-9]+)|\[[a-f0-9:]+\]"`  ]; then
+	DIGGERTARGETIP="$DIGGERTARGET"
+	echo "OK, running check now..." | grep --color -E 'OK||running check now'
+	echo 'Results:' | grep --color 'Results'
+else
+	if [ "$resolver" == 1 ]; then
+		DIGGERTARGETIP=`resolveip -s "$DIGGERTARGET"`
+	fi
+	if [ "$resolver" == 2 ]; then
+		DIGGERTARGETIP=`dig +short "$DIGGERTARGET"`
+	fi
+	if [ "$resolver" == 3 ]; then
+		DIGGERTARGETIP=`host "$DIGGERTARGET" | awk '/^[[:alnum:].-]+ has address/ { print $4 }'`
+	fi
+	if [ "$resolver" == 4 ]; then
+		DIGGERTARGETIP=`nslookup "$DIGGERTARGET" | awk '/^Address: / { print $2 }'`
+	fi
+	if [ "$?" != 0 ]; then
+	 	echo "Error: cannot resolve provided hostname $TARGET to known IP address" | grep --color -E 'Error||cannot resolve provided hostname||to known IP address'
+		exit 0;
+	fi
+	echo 
+	echo "OK, resolved $DIGGERTARGET to IP $DIGGERTARGETIP, running digger tool now..." | grep --color -E 'OK||resolved||to IP||running digger tool now'
+fi
+digger_nmap_chk &
+alexa_check
+sameIP_check
+digger_bing_mobile_shared_checker
+digger_sub_chk
+digger_whois_chk
+digger_nmap_chk2
+
+#Greetz to and from INTRA!
+#EOF

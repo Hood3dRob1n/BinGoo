@@ -1,0 +1,82 @@
+#!/bin/bash
+# File/Page Finder Script
+# This is by no means a full scale 100% check, just a simple slap together script i wrote to test based on server responses
+# Assumes server will respond with 200 OK if present or soemthing else if not...use your brain to judge the results accordingly ;)
+#
+
+pagecount_split(){
+	PAGELISTCOUNT=$(wc -l $FINDERLIST | cut -d' ' -f1)
+
+# Perform make shift multi-threading for link files larger than 2000 links as otherwise it might take a while to run through all and run all checks
+	if [ "$PAGELISTCOUNT" -ge 1000 ]; then
+#Split  LINKFILE into smaller chunks for faster processing time (more noticable when using mass dorker and have more than 2000 links to analyze)
+		split -d -l 500 "$FINDERLIST" pagefile-tmp_
+
+		for pagefile in $(find . -type f -name pagefile-tmp_\* 2> /dev/null);
+		do
+			pagecheck &
+		done
+		wait
+
+	fi
+	if [ "$PAGELISTCOUNT" -lt 1000 ]; then
+#Split  LINKFILE into smaller chunks for faster processing time (more noticable when using mass dorker and have more than 2000 links to analyze)
+		split -d -l 250 "$FINDERLIST" pagefile-tmp_
+
+		for pagefile in $(find . -type f -name pagefile-tmp_\* 2> /dev/null);
+		do
+			pagecheck &
+		done
+		wait
+
+	fi
+	rm -rf pagefile-tmp_* 2> /dev/null
+}
+
+# Pagecheck
+pagecheck(){
+	cat "$pagefile" | sort | uniq | while read pagefinder
+	do
+		TARGETSITE="$TARGET""$pagefinder"
+		curl $TARGETSITE -I -e "http://www.google.com/q?=knockknock" -A "$uagent3" -o "$STORAGE1" 2> /dev/null
+		cat "$STORAGE1" | sed '2,20d' | cut -d' ' -f2 > "$STORAGE2" 2> /dev/null
+		cat "$STORAGE2" | while read pageused
+		do
+			if [ "$pageused" == '200' ]; then
+				echo "[ 200 SUCCESS ] $TARGETSITE" | grep --color '\[ 200 SUCCESS \]'
+			elif [ "$pageused" == '302' ]; then
+				echo "[ 302 Redirect ] $TARGETSITE" | grep '\[ 302 Redirect \]'
+			elif [ "$pageused" == '403' ]; then
+				echo "[ 403 Forbidden ] $TARGETSITE" | grep '\[ 403 Forbidden \]'
+			fi
+		done
+	done
+}
+
+
+#main...
+echo
+echo "Please provide site link to try and find admin page for: " | grep --color 'Please provide site link to try and find admin page for'
+read PAGEFIND
+echo
+TARGET="$PAGEFIND"
+
+if [ ! -r "$FINDERLIST" ]; then
+	echo
+	echo "Can't read plugins/admin.lst, please re-try with another file set in source or check permissions..." | grep --color -E 'Can||t read plugins||admin||lst list||please re||try with another file set in source or check permissions'
+	echo
+	banner
+	analyze_type
+fi
+
+echo 'Here we go....' | grep --color 'Here we go'
+pagecount_split
+echo
+echo "All done now, hope we found what you wanted!" | grep --color -E 'All done now, hope we found what you wanted'
+banner
+start_engine
+
+rm -rf "$STORAGE1"
+rm -rf "$STORAGE2"
+
+#EOF

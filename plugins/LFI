@@ -1,0 +1,133 @@
+#!/bin/bash
+
+
+lfi_banner(){
+	echo
+	echo
+	echo
+	echo
+cat<<"EOT"
+ |    __|_ _| __ __|         |     
+ |    _|   |     |  _ \  _ \ |(_-< 
+____|_|  ___|   _|\___/\___/_|___/ 
+
+EOT
+}
+
+lfi_core(){
+	echo "Please select which option to use: " | grep --color 'Please select which option to use'
+	select lfi_tool in "Fimap Wrapper" "HR LFI Validator" "Return to Main Menu" "Exit"
+	do
+		case $lfi_tool in
+			"Fimap Wrapper")
+				echo
+				echo
+				fimap_wrapper
+			;;
+			"HR LFI Validator")
+				source plugins/lfi-validator
+				wait
+				lfi_banner
+				lfi_core
+			;;
+			"Return to Main Menu")
+				banner
+				start_engine
+			;;
+			"Exit")
+				echo
+				echo "OK, exiting now..." | grep --color -E 'OK||exiting now'
+				echo
+				exit 0;
+			;;
+		esac
+	done
+}
+
+fimap_wrapper(){
+	#Call FIMAP based on user need (single or list scan) - comment out the question below and just define the path (FPATH) if you dont want to be asked everytime you run it :)
+	echo "Welcome to the FIMAP wrapper" | grep --color 'Welcome to the FIMAP wrapper'
+	if [ -z "$FPATH" ]; then
+		echo
+		echo "Please provide the path to FIMAP: " | grep --color 'Please provide the path to FIMAP'
+		read FIMAPPATH
+		FPATH="$FIMAPPATH"
+	fi
+	if [ ! -e "$FPATH/fimap.py" ]; then
+		echo
+		echo "Can't find fimap :("
+		lfi_banner
+		lfi_core	
+	fi
+	echo
+	echo "Please select which option you want to use: " | grep --color 'Please select which option you want to use'
+	select fimap_wrapper in "Scan LFI.results File" "Scan My Links File" "Scan Single Link" "Return to Main Menu" "Exit"
+	do
+		case $fimap_wrapper in
+			"Scan LFI.results File")
+				echo
+				if [ ! -r results/LFI.results ]; then
+					echo "Can't read results/LFI.results file! Please check and make sure it exists or check permissions and re-run...." | grep --color -E 'Can||t read results||LFI||results file||Please check and make sure it exists or check permissions and re||run'
+					lfi_core
+				else
+					echo "Ok, hang tight just a sec...." | grep --color -E 'Ok||hang tight just a sec'
+					echo
+					trapper=1
+					cat results/LFI.results | sed 's/\[ LFI VULN FOUND \]//' | cut -d' ' -f2 | sed 's/%27//' > "$STORAGE1"
+					python $FPATH/fimap.py -m -l $STORAGE1 -b --bmin=4 --bmax=9 -D --dot-trunc-also-unix -A $uagent3 -C --force-run
+					trapper=0
+				fi
+				rm -rf "$STORAGE1" 2> /dev/null
+				lfi_banner
+				fimap_wrapper
+			;;
+			"Scan My Links File")
+				echo
+				echo "OK, please provide path to links file to analyze for LFI: " | grep --color -E 'OK||please provide path to links file to analyze for LFI'
+				read FIMAPLINKS
+				echo
+				if [ ! -r "$FIMAPLINKS" ]; then
+					echo "Can't read provided file, please try another file or check permissions..." | grep --color -E 'Can||t read provided file||please try another file or check permissions'
+					echo
+					lfi_core
+				else
+					echo "Starting scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
+					trapper=1
+					python $FPATH/fimap.py -m -l $FIMAPLINKS -b --bmin=4 --bmax=9 -D --dot-trunc-also-unix -A $uagent3 -C --force-run
+					trapper=0
+				fi
+				lfi_banner
+				fimap_wrapper
+			;;
+			"Scan Single Link")
+				echo
+				echo "Please provide site link to test for LFI: " | grep --color 'Please provide site link to test for LFI'
+				read FIMAPSNGL
+				echo
+				echo "Thanks, here we go..." | grep --color -E 'Thanks||here we go'
+				echo
+				python $FPATH/fimap.py -s -u $FIMAPSNGL -b --bmin=4 --bmax=9 -D --dot-trunc-also-unix -A $uagent1 -C --force-run
+				lfi_banner
+				fimap_wrapper
+			;;
+			"Return to Main Menu")
+				banner
+				start_engine
+			;;
+			"Exit")
+				echo
+				echo "OK, exiting now..." | grep --color -E 'OK||exiting now'
+				echo
+				exit 0;
+			;;
+		esac
+	done
+}
+
+
+
+# MAIN......................................
+lfi_banner
+lfi_core
+
+#EOF

