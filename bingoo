@@ -226,7 +226,7 @@ core(){
 		case $scan_type in
 			"Single Dork Scan")
 				echo
-				echo "Please provide Google dork to use: " | grep --color 'Please provide Google dork to use'
+				echo "Please provide Google dork to uses: " | grep --color 'Please provide Google dork to use'
 				read DORK
 				echo
 				echo "Starting scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
@@ -251,7 +251,7 @@ core(){
 					echo "Can't read provided file, please try another file or check permissions..." | grep --color -E 'Can||t read provided file||please try another file or check permissions'
 					echo			
 				else
-					echo "Starting scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
+					echo "memulai scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
 					echo
 					if [ $METH == B ]; then
 						cat "$DORKFILE" | while read dork
