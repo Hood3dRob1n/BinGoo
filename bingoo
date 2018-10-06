@@ -52,7 +52,7 @@ bashtrap(){
 	if [ "$trapper" = 0 ]; then
 		echo
 		echo
-		echo 'CTRL+C has been detected!.....shutting down now' | grep --color '.....shutting down now'
+		echo 'CTRL+C Terdeteksi!.....Mematikan' | grep --color '.....Mematikan'
 		rm -rf "$STORAGE1" 2> /dev/null
 		rm -rf "$STORAGE2" 2> /dev/null
 		cat "$STORAGE3" | uniq >> results/crash_dumped.results 2> /dev/null 2>&1
@@ -226,7 +226,7 @@ core(){
 		case $scan_type in
 			"Single Dork Scan")
 				echo
-				echo "Please provide Google dork to use: " | grep --color 'Please provide Google dork to use'
+				echo "Please provide Google dork to uses: " | grep --color 'Please provide Google dork to use'
 				read DORK
 				echo
 				echo "Starting scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
@@ -251,7 +251,7 @@ core(){
 					echo "Can't read provided file, please try another file or check permissions..." | grep --color -E 'Can||t read provided file||please try another file or check permissions'
 					echo			
 				else
-					echo "Starting scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
+					echo "memulai scan, be patient this will take a sec..." | grep --color -E 'Starting scan||be patient this will take a sec'
 					echo
 					if [ $METH == B ]; then
 						cat "$DORKFILE" | while read dork
