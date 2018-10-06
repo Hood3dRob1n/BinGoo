@@ -52,7 +52,7 @@ bashtrap(){
 	if [ "$trapper" = 0 ]; then
 		echo
 		echo
-		echo 'CTRL+C has been detected!.....shutting down now' | grep --color '.....shutting down now'
+		echo 'CTRL+C Terdeteksi!.....Mematikan' | grep --color '.....Mematikan'
 		rm -rf "$STORAGE1" 2> /dev/null
 		rm -rf "$STORAGE2" 2> /dev/null
 		cat "$STORAGE3" | uniq >> results/crash_dumped.results 2> /dev/null 2>&1
